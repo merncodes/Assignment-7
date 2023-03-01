@@ -1,0 +1,15 @@
+---
+title: "A7_20105807"
+author: "Marin H"
+date: "2023-03-01"
+output: html_document
+---
+
+https://github.com/merncodes/Assignment-7
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
