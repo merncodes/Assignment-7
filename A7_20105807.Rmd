@@ -5,11 +5,166 @@ date: "2023-03-01"
 output: html_document
 ---
 
-https://github.com/merncodes/Assignment-7
+
+# **Dragon Phylogenies**  
+
+*https://github.com/merncodes/Assignment-7*
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+### Library set-up 
+```{r, message = F}
+library(ape) # for importing nexus file type
+library(ggtree) # for constructing phylogenetic tree
+library(ggplot2) # for phylogenetic tree
+```
 
+### Load dragon phylogenies
+```{r}
+# Load Colautti lab dragon phylogeny 
+Original_dragons <- read.nexus.data("/Users/mh_mac/Documents/CLASSES/BIOL 432/Week 7/Assignment 7/DragonMatrix.nex")
+
+# Load my select three dragons
+My_dragons <- read.csv("/Users/mh_mac/Documents/CLASSES/BIOL 432/Week 7/Assignment 7/Dragon_traits.csv", colClasses = "character")
+```
+
+### Process binary variables
+```{r}
+# Collapse individual binary variable traits into one vector
+Smaug_full <- paste(My_dragons$Smaug, collapse = "") 
+Drogon_full <- paste(My_dragons$Drogon, collapse = "")
+Horntail_full <- paste(My_dragons$Horntail, collapse = "")
+
+# Convert vector to a list of the same length but separate each digit 
+Smaug_sep <- strsplit(Smaug_full, "") # use "" to separate digits
+Drogon_sep <- strsplit(Drogon_full, "")
+Horntail_sep <- strsplit(Horntail_full, "")
+
+# Combine original nexus file list with the new dragon lists
+All_dragons <- c(Original_dragons, Smaug_sep, Drogon_sep, Horntail_sep)
+
+# Change names of the new dragon lists 
+names(All_dragons)[[78]] <- "75BritishX"
+names(All_dragons)[[79]] <- "76BritishX"
+names(All_dragons)[[80]] <- "77BritishX"
+```
+
+### Save to file
+```{r}
+write.nexus.data(All_dragons, file = "input.nex")
+```
+
+### Apply weightings to traits 
+```{r}
+# This code was provided during Week 7 tutorial 
+
+WeightsDat <- read.csv("/Users/mh_mac/Documents/CLASSES/BIOL 432/Week 7/Assignment 7/Weights.csv")
+
+Weights <- paste0(WeightsDat$Weight, collapse="")
+Weights <- strsplit(Weights, split="")[[1]]
+
+WeightsNum <- rep(NA, length(Weights))
+for(i in 1:length(WeightsNum)) {
+  if(Weights[i] %in% LETTERS) {
+    WeightsNum[i] <- which(LETTERS==Weights[i])+9
+  } else {
+    WeightsNum[i] <- Weights[i]
+  }
+}
+WeightsNum <- as.numeric(WeightsNum)
+
+
+WtDragonNexus <- All_dragons
+for(i in 1:length(All_dragons)) {
+  RepWeight <- All_dragons[[i]]==1
+  WtDragonNexus[[i]][RepWeight] <- WeightsNum[RepWeight]
+  RepWeight <-  NA
+}
+```
+
+### Create distance matrix
+```{r, warning = F}
+# This code was provided during Week 7 tutorial 
+
+# convert weighted traits to a data frame, but first must flatten list
+WtDragonNexusDF <- data.frame(matrix(unlist(WtDragonNexus), ncol=78, byrow=T))
+# re-assign list names to new data frame
+row.names(WtDragonNexusDF) <- names(WtDragonNexus)
+# generate distance matrix to determine how different traits are from each other
+  # 'euclidean' specifies how 'distances' are calculated 
+WtDragonDist <- dist(WtDragonNexusDF, method = 'euclidean')
+# convert the asymmetric distance matrix to a symmetric matrix
+WtDragonDistMat <- as.matrix(WtDragonDist)
+```
+
+
+### New dragons in the phylogeny
+
+![](/Users/mh_mac/Documents/CLASSES/BIOL 432/Week 7/Assignment 7/Images/Horntail.jpg)
+
+###### **Figure 1.** AI-generated 15-year-old Horntail Dragon. Dragon traits predicted based on pre-historic artefacts and genetic samples found in modern day United Kingdom. Image constructed by *https://monsterlegacy.net/2013/03/07/harry-potter-dragon-hungarian-horntail/*
+
+
+![](/Users/mh_mac/Documents/CLASSES/BIOL 432/Week 7/Assignment 7/Images/Smaug.png) 
+
+###### **Figure 2.** AI-generated 6000 year-old Uruloki Dragon. Dragon traits predicted based on pre-historic artefacts and genetic samples found in modern day United Kingdom. Image constructed by *https://lotr.fandom.com/wiki/Smaug*
+
+![](/Users/mh_mac/Documents/CLASSES/BIOL 432/Week 7/Assignment 7/Images/Drogon.jpg) 
+
+###### **Figure 3.** AI-generated 7-year-old Valerian Dragon. Dragon traits predicted based on pre-historic artefacts and genetic samples found in modern day United Kingdom. Image constructed by *https://www.harpersbazaar.com/culture/film-tv/a27522097/game-of-thrones-drogon-iron-throne-reactions/*
+
+
+### Compute phylogeny
+```{r}
+# Generates the phylogeny based on the distance matrix. nj() 
+WtDragonTree <- fastme.bal(WtDragonDist)
+
+# nj() refers to neighbourhood-joining, which is an algorithm that generates a phylogeny by starting with the smallest 'distance' between traits in the distance matrix then the next smallest distance, etc. 
+WtDragonTreeNJ <- nj(WtDragonDist)
+```
+
+### Generate phylogeny
+
+#### Determine critical nodes 
+```{r, fig.wdith = 5}
+WtDTclade <- ggtree::groupClade(WtDragonTree, .node = 157)
+
+ggtree::ggtree(WtDTclade, layout = "rectangular") +
+  geom_nodelab(aes(label = node))
+
+# my new dragons belong to node 157
+```
+#### Highlight monophyletic group of new dragons
+```{r, fig.width = 9, fig.height = 8, warning=F}
+ggtree(WtDTclade, layout = "rectangular", aes(colour=group), mrsd = "2023-01-01") +
+  geom_tiplab(size = 2.5, offset = 0.01) +
+  geom_tippoint(aes(colour = group)) +
+  annotate("point", 2017, 12.3, hjust=0, size=2, colour = "coral2") +
+  annotate("text", 2017, 12.2, hjust=-0.1, size=4, label= "Original dragons") +
+  annotate("point", 2017, 10.3, hjust=0, size=2, colour = "darkturquoise") +
+  annotate("text", 2017, 10.3, hjust=-0.1, size=4, label= "New dragons") +
+  theme(legend.position="none") +
+  annotate("text", 1996, 1.7, hjust=-0.1, size=5, label= "Time") +
+  geom_segment(x = 2000, y = 1.5, xend = 2005, yend = 1.5, 
+               arrow = arrow(length = unit(0.4, "cm")), colour = "black")
+```
+
+**Figure 4.** Phylogenetic tree displaying evolutionary relationships among dragons. Tree constructed by neighbour-joining algorithm. Distance matrix based on 25 weight dragon traits observed in artefacts. Red colouration represents previously recorded dragon samples. Turquoise colouration represents novel dragon records. Time along the x-axis
+
+
+## Interpretation
+
+#### Introduction
+Dragons have been extinct for over 2,000 years. Until recently, evolutionary relationships of dragons could only be estimated through observation of historical art pieces. However, recent discovery of ancient fractured dragon DNA throughout the United Kingdom, combined with advances in artificial intelligence functional/structural genomic prediction technologies, have enabled expansion of the modern dragon phylogeny. This study characterizes the appearance of three AI-predicted dragon species as well as their phylogenetic relationship to previously studied dragons. 
+
+#### Methods
+Three dragon samples collected by Dr. Bilbo Baggins were sequenced, assembled, and run against NCBI BLAST to estimate structural and functional properties. Predicted traits were coded as binary variables, and weighted using the same scale as previously characterized dragons, and subjected to neighbour-joining algorithms. 
+
+#### Results
+The three new dragon species, 75British, 76British and 77British diverged early on from all previously recorded dragons. 
+
+#### Discussion
+The size-fire-breathing trade-off hypothesis has long postulated that over-time dragons evolved to be smaller in favour of acquiring more robust fire-breathing abilities. All three identified new dragons - 75British, 76British and 77British - appeared near the root of the phylogenetic tree, indicating that they diverged early on from the majority of dragons. All three new dragons were twice as large as any previosuly characterized dragon, with 76British estimated to be 20-fold larger than the average dragon. This research indicates that this group of dragons likely possessed a hormonal growth factor resulting in significantly larger stature, causing divergence from other dragon groups. Future studies are required to elucidate the causative growth hormone. 
 
